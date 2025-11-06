@@ -5,7 +5,7 @@
 ```
 charmplus/
 ├── backend/                    # Django REST Framework backend
-│   ├── champlus_api/          # Main Django project settings
+│   ├── charmplus_api/          # Main Django project settings
 │   ├── users/                 # Users app
 │   ├── groups/                # Groups app
 │   ├── transactions/          # Transactions app
