@@ -1,0 +1,241 @@
+### ChamPlus API Manual Test Suite
+### Usage:
+### 1. Run the backend server: python manage.py runserver
+### 2. Use the "Run" button in IntelliJ/VS Code to execute requests
+### 3. Variables are stored in the environment file (http-client.env.json) or defined here.
+###    For this file, we use @variable syntax for simplicity.
+
+@host = http://localhost:8000
+@tenant_host = http://testtenant.localhost:8000
+@admin_email = admin@test.com
+@admin_password = password
+@member_email = member@test.com
+@member_password = password
+
+### ============================================================================
+### 1. AUTHENTICATION
+### ============================================================================
+
+### 1.1 Login (Get Tokens)
+# @name login
+POST {{host}}/api/token/
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "{{admin_password}}"
+}
+
+> {%
+    client.global.set("auth_token", response.body.access);
+    client.global.set("refresh_token", response.body.refresh);
+%}
+
+### 1.2 Refresh Token
+POST {{host}}/api/token/refresh/
+Content-Type: application/json
+
+{
+  "refresh": "{{refresh_token}}"
+}
+
+### 1.3 Login with 2FA (Step 1)
+# @name login_2fa
+POST {{host}}/api/security/login-2fa/
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "{{admin_password}}"
+}
+
+### 1.4 Verify 2FA OTP (Step 2)
+# Replace '123456' with the actual OTP sent to email/console
+POST {{host}}/api/security/verify-otp/
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "otp": "123456"
+}
+
+### ============================================================================
+### 2. TENANTS & GROUPS
+### ============================================================================
+
+### 2.1 Register New Tenant & Group
+POST {{host}}/api/tenants/register/
+Content-Type: application/json
+
+{
+  "tenant_name": "Demo Tenant",
+  "subdomain": "demo",
+  "group_name": "Demo Chama",
+  "admin_email": "demo@admin.com",
+  "admin_password": "password123",
+  "admin_first_name": "Demo",
+  "admin_last_name": "Admin"
+}
+
+### 2.2 List My Groups
+GET {{tenant_host}}/api/groups/
+Authorization: Bearer {{auth_token}}
+
+### ============================================================================
+### 3. MEMBERSHIP
+### ============================================================================
+
+### 3.1 List Members
+GET {{tenant_host}}/api/members/
+Authorization: Bearer {{auth_token}}
+
+### 3.2 Invite Member
+POST {{tenant_host}}/api/members/invite/
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "email": "newmember@test.com",
+  "role": "member"
+}
+
+### ============================================================================
+### 4. FINANCIALS
+### ============================================================================
+
+### 4.1 Log Contribution
+POST {{tenant_host}}/api/financials/contributions/
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "amount": "5000.00",
+  "date": "2025-11-22",
+  "payment_method": "cash"
+}
+
+### 4.2 Log Expense
+POST {{tenant_host}}/api/financials/expenses/
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "amount": "2000.00",
+  "category": "Transport",
+  "description": "Transport to meeting",
+  "date": "2025-11-22"
+}
+
+### 4.3 View Ledger
+GET {{tenant_host}}/api/financials/ledger/
+Authorization: Bearer {{auth_token}}
+
+### 4.4 Dashboard Stats
+GET {{tenant_host}}/api/financials/dashboard/
+Authorization: Bearer {{auth_token}}
+
+### ============================================================================
+### 5. LOANS
+### ============================================================================
+
+### 5.1 Apply for Loan
+# @name apply_loan
+POST {{tenant_host}}/api/loans/
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "amount": "10000.00",
+  "duration_months": 3,
+  "purpose": "Emergency"
+}
+
+> {%
+    client.global.set("loan_id", response.body.id);
+%}
+
+### 5.2 Approve Loan (Admin)
+POST {{tenant_host}}/api/loans/{{loan_id}}/approve/
+Authorization: Bearer {{auth_token}}
+
+### 5.3 Disburse Loan (Triggers Approval Workflow)
+POST {{tenant_host}}/api/loans/{{loan_id}}/disburse/
+Authorization: Bearer {{auth_token}}
+
+### ============================================================================
+### 6. APPROVALS (MAKER-CHECKER)
+### ============================================================================
+
+### 6.1 List Pending Approvals
+GET {{tenant_host}}/api/approvals/
+Authorization: Bearer {{auth_token}}
+
+# @name list_approvals
+# Capture the first pending approval ID
+# In a real scenario, you'd pick the one you just created
+
+### 6.2 Approve Request (Must be a DIFFERENT admin)
+# Replace UUID with the ID from 6.1
+POST {{tenant_host}}/api/approvals/<APPROVAL_ID>/approve/
+Authorization: Bearer {{auth_token}}
+
+### ============================================================================
+### 7. PAYMENTS
+### ============================================================================
+
+### 7.1 Initiate Stripe Payment
+POST {{tenant_host}}/api/payments/initiate/
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "provider": "stripe",
+  "amount": "100.00",
+  "currency": "USD"
+}
+
+### 7.2 Initiate MTN Payment
+POST {{tenant_host}}/api/payments/initiate/
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "provider": "mtn",
+  "amount": "5000.00",
+  "currency": "RWF",
+  "phone_number": "250788123456"
+}
+
+### 7.3 Initiate Bank Transfer (Manual)
+# Note: File upload is tricky in .http files. 
+# Usually requires multipart/form-data boundary manually or IDE support.
+POST {{tenant_host}}/api/payments/initiate/
+Authorization: Bearer {{auth_token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="provider"
+
+bank_transfer
+--WebAppBoundary
+Content-Disposition: form-data; name="amount"
+
+15000.00
+--WebAppBoundary
+Content-Disposition: form-data; name="currency"
+
+RWF
+--WebAppBoundary
+Content-Disposition: form-data; name="proof_of_payment"; filename="proof.txt"
+Content-Type: text/plain
+
+(Simulated File Content)
+--WebAppBoundary--
+
+### ============================================================================
+### 8. SECURITY & AUDIT
+### ============================================================================
+
+### 8.1 View Audit Logs
+GET {{tenant_host}}/api/security/audit-logs/
+Authorization: Bearer {{auth_token}}
