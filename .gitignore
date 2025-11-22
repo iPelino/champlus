@@ -28,3 +28,13 @@ backend/proofs/
 # Environment
 .env
 http-client.env.json
+
+# Project Specific
+format_issues
+format_issues.py
+github_issues_report
+github_issues_report.md
+issue.json
+issues.json
+strategic_commit
+strategic_commit.sh
